@@ -27,7 +27,7 @@ const basePattern = `\\S+ \\S+ \\S+ \\S+ \\S+`;
 
 export const baseExp = new RegExp(basePattern);
 
-function getSchedules(cronExp) {
+export function getSchedules(cronExp) {
   if (baseExp.exec(cronExp) === null) {
     throwWrongPatternError(cronExp);
   }
@@ -56,7 +56,7 @@ function throwWrongPatternError(expression) {
   throw new Error(`Wrong pattern: ${expression}`);
 }
 
-function parse(str, exp, name) {
+export function parse(str, exp, name) {
   const result = exp.exec(str);
   if (result === null) {
     throw new Error();
@@ -83,7 +83,7 @@ function parse(str, exp, name) {
   return components;
 }
 
-function combine(array1, array2) {
+export function combine(array1, array2) {
   return array1.flatMap(item1 => array2.map(item2 => ({ ...item1, ...item2 })));
 }
 
