@@ -1,4 +1,10 @@
-import assert from 'node:assert';
+const MAX = {
+  minute: 59,
+  hour: 23,
+  day: 31,
+  month: 12,
+  weekday: 6,
+}
 
 const p_minute = '[1-5]?\\d';
 const p_hour = '(1?\\d|2[0-3])';
@@ -45,7 +51,8 @@ export function getSchedules(cronExp) {
     dayComponents = parse(day, dayExp, 'day');
     monthComponents = parse(month, monthExp, 'month');
     weekdayComponents = parse(weekday, weekdayExp, 'weekday');
-  } catch (_) {
+  } catch (err) {
+    console.error(err);
     throwWrongPatternError(cronExp);
   }
 
@@ -76,9 +83,30 @@ export function parse(str, exp, name) {
       components.push({ [name]: parseInt(value) });
     });
   }
-  // TODO range
-  // TODO every/step
-  // TODO range/step
+  if (result.groups.range) {
+    const [start, end] =
+      result.groups.range.split('-')
+        .map(strValue => parseInt(strValue));
+    for (let value = start; value <= end; value += 1) {
+      components.push({ [name]: value });
+    }
+  }
+  if (result.groups.rangeStep) {
+    const [start, end, step] =
+      result.groups.rangeStep.split(/[-\/]/)
+        .map(strValue => parseInt(strValue));
+    for (let value = start; value <= end; value += step) {
+      components.push({ [name]: value });
+    }
+  }
+  if (result.groups.everyStep) {
+    const [, step] =
+      result.groups.everyStep.split('/')
+        .map(strValue => parseInt(strValue));
+    for (let value = 0; value <= MAX[name]; value += step) {
+      components.push({ [name]: value });
+    }
+  }
 
   return components;
 }
@@ -87,30 +115,4 @@ export function combine(array1, array2) {
   return array1.flatMap(item1 => array2.map(item2 => ({ ...item1, ...item2 })));
 }
 
-[
-  ['0 0 * * *', [
-    { hour: 0, minute: 0 }
-  ]],
-  ['0,30 0 * * *', [
-    { hour: 0, minute: 0 },
-    { hour: 0, minute: 30 }
-  ]],
-  ['0 0,1 * * *', [
-    { hour: 0, minute: 0 },
-    { hour: 1, minute: 0 }
-  ]],
-  ['0,30 0,1 * * *', [
-    { hour: 0, minute: 0 },
-    { hour: 0, minute: 30 },
-    { hour: 1, minute: 0 },
-    { hour: 1, minute: 30 }
-  ]],
-  ['0 0 1 1 *', [
-    { month: 1, day: 1, hour: 0, minute: 0 }
-  ]],
-  ['0 0 * * 0', [
-    { weekday: 0, hour: 0, minute: 0 }
-  ]],
-].forEach(([expression, schedule]) => {
-  assert.deepEqual(getSchedules(expression), schedule)
-})
+

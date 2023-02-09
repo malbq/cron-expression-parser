@@ -1,4 +1,4 @@
-entrypoint = "index.js"
+entrypoint = "test.js"
 
 hidden = [".config"]
 
