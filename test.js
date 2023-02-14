@@ -2,11 +2,24 @@ import assert from 'node:assert';
 import { getSchedules } from './index.js';
 
 [
-  ['0 * * * *', [{ minute: 0 }]],
-  ['* 0 * * *', [{ hour: 0 }]],
-  ['* * 1 * *', [{ day: 1 }]],
-  ['* * * 1 *', [{ month: 1 }]],
-  ['* * * * 0', [{ weekday: 0 }]],
+  ['* * * * *', [
+    {}
+  ]],
+  ['0 * * * *', [
+    { minute: 0 }
+  ]],
+  ['* 0 * * *', [
+    { hour: 0 }
+  ]],
+  ['* * 1 * *', [
+    { day: 1 }
+  ]],
+  ['* * * 1 *', [
+    { month: 1 }
+  ]],
+  ['* * * * 0', [
+    { weekday: 0 }
+  ]],
   ['0 0 1 1 0', [
     { weekday: 0, month: 1, day: 1, hour: 0, minute: 0 }
   ]],
