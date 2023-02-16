@@ -29,9 +29,7 @@ const dayExp = new RegExp(pattern.replaceAll(p_value, p_day));
 const monthExp = new RegExp(pattern.replaceAll(p_value, p_month));
 const weekdayExp = new RegExp(pattern.replaceAll(p_value, p_weekday));
 
-const basePattern = `\\S+ \\S+ \\S+ \\S+ \\S+`;
-
-export const baseExp = new RegExp(basePattern);
+export const baseExp = /^\S+ \S+ \S+ \S+ \S+$/;
 
 export function getSchedules(cronExp) {
   if (baseExp.exec(cronExp) === null) {
