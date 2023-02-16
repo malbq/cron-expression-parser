@@ -9,7 +9,13 @@ import { getSchedules } from './index.js';
   ['* * 1 * *', [{ day: 1 }]],
   ['* * * 1 *', [{ month: 1 }]],
   ['* * * * 0', [{ weekday: 0 }]],
-  ['0 0 1 1 0', [{ weekday: 0, month: 1, day: 1, hour: 0, minute: 0 }]],
+  [
+    '0 0 1 1 0',
+    [
+      { weekday: 0, hour: 0, minute: 0 },
+      { month: 1, day: 1, hour: 0, minute: 0 },
+    ],
+  ],
   ['0,30 * * * *', [{ minute: 0 }, { minute: 30 }]],
   ['* 0,1,2 * * *', [{ hour: 0 }, { hour: 1 }, { hour: 2 }]],
   [

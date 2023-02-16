@@ -1,3 +1,11 @@
+const MIN = {
+  minute: 0,
+  hour: 0,
+  day: 1,
+  month: 1,
+  weekday: 0,
+};
+
 const MAX = {
   minute: 59,
   hour: 23,
@@ -54,13 +62,39 @@ export function getSchedules(cronExp) {
     throwWrongPatternError(cronExp);
   }
 
-  return combine(
+  if (minuteComponents.length === 0) {
+    for (let minute = MIN.minute; minute <= MAX.minute; minute += 1) {
+      minuteComponents.push({ minute });
+    }
+  }
+
+  if (hourComponents.length === 0) {
+    for (let hour = MIN.hour; hour <= MAX.hour; hour += 1) {
+      hourComponents.push({ hour });
+    }
+  }
+
+  if (dayComponents.length > 0 && monthComponents.length === 0) {
+    for (let month = MIN.month; month <= MAX.month; month += 1) {
+      monthComponents.push({ month });
+    }
+  }
+
+  console.log({
+    minuteComponents,
+    hourComponents,
+    dayComponents,
+    monthComponents,
     weekdayComponents,
-    combine(
+  });
+
+  return [
+    ...combine(weekdayComponents, combine(hourComponents, minuteComponents)),
+    ...combine(
       monthComponents,
       combine(dayComponents, combine(hourComponents, minuteComponents))
-    )
-  );
+    ),
+  ];
 }
 
 function throwWrongPatternError(expression) {
@@ -75,9 +109,9 @@ export function parse(str, exp, name) {
 
   let components = [];
 
-  if (result.groups.every) {
-    components.push({});
-  }
+  // if (result.groups.every) {
+  //   components.push({});
+  // }
   if (result.groups.single) {
     components.push({ [name]: parseInt(result.groups.single) });
   }
