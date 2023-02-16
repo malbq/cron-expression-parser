@@ -14,6 +14,21 @@ const MAX = {
   weekday: 6,
 };
 
+const MAX_DAY_BY_MONTH = {
+  1: 31,
+  2: 29,
+  3: 31,
+  4: 30,
+  5: 31,
+  6: 30,
+  7: 31,
+  8: 31,
+  9: 30,
+  10: 31,
+  11: 30,
+  12: 31,
+};
+
 const p_minute = '[1-5]?\\d';
 const p_hour = '(1?\\d|2[0-3])';
 const p_day = '([1-2]?[1-9]|3[0-1])';
@@ -74,27 +89,42 @@ export function getSchedules(cronExp) {
     }
   }
 
+  if (monthComponents.length > 0 && dayComponents.length === 0) {
+    for (let day = MIN.day; day <= MAX.day; day += 1) {
+      dayComponents.push({ day });
+    }
+  }
+
   if (dayComponents.length > 0 && monthComponents.length === 0) {
     for (let month = MIN.month; month <= MAX.month; month += 1) {
       monthComponents.push({ month });
     }
   }
 
-  console.log({
-    minuteComponents,
-    hourComponents,
-    dayComponents,
-    monthComponents,
-    weekdayComponents,
-  });
+  const schedules = [];
 
-  return [
-    ...combine(weekdayComponents, combine(hourComponents, minuteComponents)),
-    ...combine(
-      monthComponents,
-      combine(dayComponents, combine(hourComponents, minuteComponents))
-    ),
-  ];
+  if (
+    weekdayComponents.length === 0 &&
+    dayComponents.length === 0 &&
+    monthComponents.length === 0
+  ) {
+    schedules.push(...combine(hourComponents, minuteComponents));
+  }
+  if (weekdayComponents.length > 0) {
+    schedules.push(
+      ...combine(weekdayComponents, combine(hourComponents, minuteComponents))
+    );
+  }
+  if (dayComponents.length > 0 || monthComponents.length > 0) {
+    schedules.push(
+      ...combine(
+        monthComponents,
+        combine(dayComponents, combine(hourComponents, minuteComponents))
+      )
+    );
+  }
+
+  return schedules;
 }
 
 function throwWrongPatternError(expression) {
@@ -109,9 +139,6 @@ export function parse(str, exp, name) {
 
   let components = [];
 
-  // if (result.groups.every) {
-  //   components.push({});
-  // }
   if (result.groups.single) {
     components.push({ [name]: parseInt(result.groups.single) });
   }
@@ -150,7 +177,25 @@ export function parse(str, exp, name) {
 }
 
 export function combine(array1, array2) {
-  return array1.flatMap((item1) =>
-    array2.map((item2) => ({ ...item1, ...item2 }))
-  );
+  const _array1 = array1.length > 0 ? array1 : [{}];
+  const _array2 = array2.length > 0 ? array2 : [{}];
+  return _array1
+    .flatMap((item1) =>
+      _array2.map((item2) => {
+        if (
+          item1.month !== undefined &&
+          item2.day > MAX_DAY_BY_MONTH[item1.month]
+        ) {
+          return {};
+        }
+        if (
+          item2.month !== undefined &&
+          item1.day > MAX_DAY_BY_MONTH[item2.month]
+        ) {
+          return {};
+        }
+        return { ...item1, ...item2 };
+      })
+    )
+    .filter((item) => Object.keys(item).length > 0);
 }
