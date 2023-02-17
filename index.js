@@ -29,37 +29,44 @@ const MAX_DAY_BY_MONTH = {
   12: 31,
 };
 
-const p_minute = '[1-5]?\\d';
-const p_hour = '(1?\\d|2[0-3])';
-const p_day = '([1-2]?[1-9]|3[0-1])';
-const p_month = '([1-9]|1[0-2])';
-const p_weekday = '[0-6]';
+const valuePatterns = {
+  minute: '[1-5]?\\d',
+  hour: '(1?\\d|2[0-3])',
+  day: '([1-2]?[1-9]|3[0-1])',
+  month: '([1-9]|1[0-2])',
+  weekday: '[0-6]',
+};
 
-const p_value = '$$';
+const typePatterns = {
+  Single: `#`,
+  Every: `\\*`,
+  EveryStep: `\\*/#`,
+  List: `#(,#)+`,
+  Range: `#-#`,
+  RangeStep: `#-#/#`,
+};
 
-const p_single = `${p_value}`;
-const p_every = `\\*`;
-const p_every_step = `\\*/${p_value}`;
-const p_list = `${p_value}(,${p_value})+`;
-const p_range = `${p_value}-${p_value}`;
-const p_range_step = `${p_value}-${p_value}/${p_value}`;
+const fieldPatterns = {};
 
-const pattern = `^((?<rangeStep>${p_range_step})|(?<range>${p_range})|(?<list>${p_list})|(?<everyStep>${p_every_step})|(?<every>${p_every})|(?<single>${p_single}))$`;
+Object.entries(valuePatterns).forEach(([field, valuePattern]) => {
+  fieldPatterns[field] =
+    '(' +
+    Object.entries(typePatterns)
+      .map(([type, typePattern]) => `(?<${field}${type}>${typePattern})`)
+      .join('|')
+      .replaceAll('#', valuePattern) +
+    ')';
+});
 
-const minuteExp = new RegExp(pattern.replaceAll(p_value, p_minute));
-const hourExp = new RegExp(pattern.replaceAll(p_value, p_hour));
-const dayExp = new RegExp(pattern.replaceAll(p_value, p_day));
-const monthExp = new RegExp(pattern.replaceAll(p_value, p_month));
-const weekdayExp = new RegExp(pattern.replaceAll(p_value, p_weekday));
+export const cronRegExp = new RegExp(
+  `^${fieldPatterns.minute} ${fieldPatterns.hour} ${fieldPatterns.day} ${fieldPatterns.month} ${fieldPatterns.weekday}$`
+);
 
-export const baseExp = /^\S+ \S+ \S+ \S+ \S+$/;
-
-export function getSchedules(cronExp) {
-  if (baseExp.exec(cronExp) === null) {
-    throwWrongPatternError(cronExp);
+export function getSchedules(cronExpression) {
+  const result = cronRegExp.exec(cronExpression);
+  if (result === null) {
+    throwWrongPatternError(cronExpression);
   }
-
-  const [minute, hour, day, month, weekday] = cronExp.split(' ');
 
   let minuteComponents,
     hourComponents,
@@ -67,14 +74,14 @@ export function getSchedules(cronExp) {
     monthComponents,
     weekdayComponents;
   try {
-    minuteComponents = parse(minute, minuteExp, 'minute');
-    hourComponents = parse(hour, hourExp, 'hour');
-    dayComponents = parse(day, dayExp, 'day');
-    monthComponents = parse(month, monthExp, 'month');
-    weekdayComponents = parse(weekday, weekdayExp, 'weekday');
+    minuteComponents = extract(result, 'minute');
+    hourComponents = extract(result, 'hour');
+    dayComponents = extract(result, 'day');
+    monthComponents = extract(result, 'month');
+    weekdayComponents = extract(result, 'weekday');
   } catch (err) {
     console.error(err);
-    throwWrongPatternError(cronExp);
+    throwWrongPatternError(cronExpression);
   }
 
   if (minuteComponents.length === 0) {
@@ -131,45 +138,38 @@ function throwWrongPatternError(expression) {
   throw new Error(`Wrong pattern: ${expression}`);
 }
 
-export function parse(str, exp, name) {
-  const result = exp.exec(str);
-  if (result === null) {
-    throw new Error();
-  }
+export function extract(result, field) {
+  const components = [];
 
-  let components = [];
+  const single = result.groups[`${field}Single`];
+  const list = result.groups[`${field}List`];
+  const range = result.groups[`${field}Range`];
+  const rangeStep = result.groups[`${field}RangeStep`];
+  const everyStep = result.groups[`${field}EveryStep`];
 
-  if (result.groups.single) {
-    components.push({ [name]: parseInt(result.groups.single) });
-  }
-  if (result.groups.list) {
-    const values = result.groups.list.split(',');
+  if (single) {
+    components.push({ [field]: parseInt(single) });
+  } else if (list) {
+    const values = list.split(',');
     values.forEach((value) => {
-      components.push({ [name]: parseInt(value) });
+      components.push({ [field]: parseInt(value) });
     });
-  }
-  if (result.groups.range) {
-    const [start, end] = result.groups.range
-      .split('-')
-      .map((strValue) => parseInt(strValue));
+  } else if (range) {
+    const [start, end] = range.split('-').map((strValue) => parseInt(strValue));
     for (let value = start; value <= end; value += 1) {
-      components.push({ [name]: value });
+      components.push({ [field]: value });
     }
-  }
-  if (result.groups.rangeStep) {
-    const [start, end, step] = result.groups.rangeStep
+  } else if (rangeStep) {
+    const [start, end, step] = rangeStep
       .split(/[-\/]/)
       .map((strValue) => parseInt(strValue));
     for (let value = start; value <= end; value += step) {
-      components.push({ [name]: value });
+      components.push({ [field]: value });
     }
-  }
-  if (result.groups.everyStep) {
-    const [, step] = result.groups.everyStep
-      .split('/')
-      .map((strValue) => parseInt(strValue));
-    for (let value = 0; value <= MAX[name]; value += step) {
-      components.push({ [name]: value });
+  } else if (everyStep) {
+    const [, step] = everyStep.split('/').map((strValue) => parseInt(strValue));
+    for (let value = 0; value <= MAX[field]; value += step) {
+      components.push({ [field]: value });
     }
   }
 
