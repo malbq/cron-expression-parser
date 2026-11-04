@@ -29,10 +29,11 @@ const MAX_DAY_BY_MONTH = {
   12: 31,
 };
 
+// Numeric ranges per field (no leading zeros, no names).
 const valuePatterns = {
-  minute: '[1-5]?\\d',
-  hour: '(1?\\d|2[0-3])',
-  day: '([1-2]?[1-9]|3[0-1])',
+  minute: '([0-9]|[1-5][0-9])',
+  hour: '([0-9]|1[0-9]|2[0-3])',
+  day: '([1-9]|[12][0-9]|3[01])',
   month: '([1-9]|1[0-2])',
   weekday: '[0-6]',
 };
@@ -58,10 +59,27 @@ Object.entries(valuePatterns).forEach(([field, valuePattern]) => {
     ')';
 });
 
+/**
+ * Full-string regexp for a 5-field cron expression:
+ * minute hour day month weekday
+ */
 export const cronRegExp = new RegExp(
   `^${fieldPatterns.minute} ${fieldPatterns.hour} ${fieldPatterns.day} ${fieldPatterns.month} ${fieldPatterns.weekday}$`
 );
 
+/**
+ * Parse a 5-field cron expression into schedule objects.
+ *
+ * Day-of-month and day-of-week follow crontab(5) (Vixie/cronie):
+ * if both are restricted (not `*`), a schedule matches when EITHER
+ * field matches (OR). If only one is restricted, that field alone applies.
+ *
+ * Impossible calendar dates (e.g. `0 0 30 2 *`) are accepted as valid
+ * syntax and yield an empty array.
+ *
+ * @param {string} cronExpression
+ * @returns {Array<Record<string, number>>}
+ */
 export function getSchedules(cronExpression) {
   const result = cronRegExp.exec(cronExpression);
   if (result === null) {
@@ -79,8 +97,7 @@ export function getSchedules(cronExpression) {
     dayComponents = extract(result, 'day');
     monthComponents = extract(result, 'month');
     weekdayComponents = extract(result, 'weekday');
-  } catch (err) {
-    console.error(err);
+  } catch {
     throwWrongPatternError(cronExpression);
   }
 
@@ -110,6 +127,7 @@ export function getSchedules(cronExpression) {
 
   const schedules = [];
 
+  // Neither day-of-month nor weekday nor month restricted → time-only schedules.
   if (
     weekdayComponents.length === 0 &&
     dayComponents.length === 0 &&
@@ -117,6 +135,8 @@ export function getSchedules(cronExpression) {
   ) {
     schedules.push(...combine(hourComponents, minuteComponents));
   }
+
+  // crontab(5): when both DOM and DOW are restricted, fire on OR of the two.
   if (weekdayComponents.length > 0) {
     schedules.push(
       ...combine(weekdayComponents, combine(hourComponents, minuteComponents))
@@ -138,6 +158,11 @@ function throwWrongPatternError(expression) {
   throw new Error(`Wrong pattern: ${expression}`);
 }
 
+/**
+ * Expand one cron field match group into component objects.
+ * @param {RegExpExecArray} result
+ * @param {'minute'|'hour'|'day'|'month'|'weekday'} field
+ */
 export function extract(result, field) {
   const components = [];
 
@@ -148,27 +173,34 @@ export function extract(result, field) {
   const everyStep = result.groups[`${field}EveryStep`];
 
   if (single) {
-    components.push({ [field]: parseInt(single) });
+    components.push({ [field]: parseInt(single, 10) });
   } else if (list) {
     const values = list.split(',');
     values.forEach((value) => {
-      components.push({ [field]: parseInt(value) });
+      components.push({ [field]: parseInt(value, 10) });
     });
   } else if (range) {
-    const [start, end] = range.split('-').map((strValue) => parseInt(strValue));
+    const [start, end] = range.split('-').map((strValue) => parseInt(strValue, 10));
     for (let value = start; value <= end; value += 1) {
       components.push({ [field]: value });
     }
   } else if (rangeStep) {
     const [start, end, step] = rangeStep
       .split(/[-\/]/)
-      .map((strValue) => parseInt(strValue));
+      .map((strValue) => parseInt(strValue, 10));
+    if (!Number.isFinite(step) || step < 1) {
+      throw new Error(`Invalid step in ${field}: ${rangeStep}`);
+    }
     for (let value = start; value <= end; value += step) {
       components.push({ [field]: value });
     }
   } else if (everyStep) {
-    const [, step] = everyStep.split('/').map((strValue) => parseInt(strValue));
-    for (let value = 0; value <= MAX[field]; value += step) {
+    const [, step] = everyStep.split('/').map((strValue) => parseInt(strValue, 10));
+    if (!Number.isFinite(step) || step < 1) {
+      throw new Error(`Invalid step in ${field}: ${everyStep}`);
+    }
+    // Fields whose natural minimum is 1 (day, month) must not emit 0.
+    for (let value = MIN[field]; value <= MAX[field]; value += step) {
       components.push({ [field]: value });
     }
   }
@@ -176,6 +208,11 @@ export function extract(result, field) {
   return components;
 }
 
+/**
+ * Cartesian product of two component arrays, dropping impossible day/month pairs.
+ * @param {Array<Record<string, number>>} array1
+ * @param {Array<Record<string, number>>} array2
+ */
 export function combine(array1, array2) {
   const _array1 = array1.length > 0 ? array1 : [{}];
   const _array2 = array2.length > 0 ? array2 : [{}];
