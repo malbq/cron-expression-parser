@@ -8,6 +8,7 @@
   "exports": {
     ".": {
       "import": "./index.js",
+      "require": "./index.js",
       "default": "./index.js"
     }
   },

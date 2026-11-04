@@ -344,3 +344,19 @@ describe('datas impossíveis', () => {
     assert.deepEqual(getSchedules('0 0 31 11 *'), []);
   });
 });
+
+describe('package exports (self-reference)', () => {
+  it('import by package name exposes the public API', async () => {
+    const api = await import('cron-expression-parser');
+    assert.equal(typeof api.getSchedules, 'function');
+    assert.equal(typeof api.combine, 'function');
+    assert.equal(typeof api.extract, 'function');
+    assert.ok(api.cronRegExp instanceof RegExp);
+    assert.deepEqual(api.getSchedules('0 0 1 1 *'), [
+      { month: 1, day: 1, hour: 0, minute: 0 },
+    ]);
+    assert.deepEqual(api.combine([{ hour: 1 }], [{ minute: 30 }]), [
+      { hour: 1, minute: 30 },
+    ]);
+  });
+});
